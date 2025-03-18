@@ -14,6 +14,8 @@
 #include <cstdint> // <cstdint> requires c++11 support
 #include <functional>
 #include <string> // std::stod
+#include <memory>
+
 
 #ifndef WITHOUT_NUMPY
 #  define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
@@ -342,18 +344,18 @@ template <> struct select_npy_type<bool> { const static NPY_TYPES type = NPY_BOO
 template <> struct select_npy_type<int8_t> { const static NPY_TYPES type = NPY_INT8; };
 template <> struct select_npy_type<int16_t> { const static NPY_TYPES type = NPY_SHORT; };
 template <> struct select_npy_type<int32_t> { const static NPY_TYPES type = NPY_INT; };
-template <> struct select_npy_type<int64_t> { const static NPY_TYPES type = NPY_INT64; };
+//template <> struct select_npy_type<int64_t> { const static NPY_TYPES type = NPY_INT64; };
 template <> struct select_npy_type<uint8_t> { const static NPY_TYPES type = NPY_UINT8; };
 template <> struct select_npy_type<uint16_t> { const static NPY_TYPES type = NPY_USHORT; };
 template <> struct select_npy_type<uint32_t> { const static NPY_TYPES type = NPY_ULONG; };
-template <> struct select_npy_type<uint64_t> { const static NPY_TYPES type = NPY_UINT64; };
+//template <> struct select_npy_type<uint64_t> { const static NPY_TYPES type = NPY_UINT64; };
 
 // Sanity checks; comment them out or change the numpy type below if you're compiling on
 // a platform where they don't apply
 static_assert(sizeof(long long) == 8);
-template <> struct select_npy_type<long long> { const static NPY_TYPES type = NPY_INT64; };
+//template <> struct select_npy_type<long long> { const static NPY_TYPES type = NPY_INT64; };
 static_assert(sizeof(unsigned long long) == 8);
-template <> struct select_npy_type<unsigned long long> { const static NPY_TYPES type = NPY_UINT64; };
+//template <> struct select_npy_type<unsigned long long> { const static NPY_TYPES type = NPY_UINT64; };
 
 template<typename Numeric>
 PyObject* get_array(const std::vector<Numeric>& v)
@@ -2645,6 +2647,71 @@ inline void save(const std::string& filename, const int dpi=0)
     Py_DECREF(kwargs);
     Py_DECREF(res);
 }
+
+
+
+
+
+//--------------------- Added code:
+
+
+
+inline std::vector<uint8_t> save_to_buffer(const int dpi = 0) 
+{
+    detail::_interpreter::get();
+
+    // Import io module
+    PyObject* io_module = PyImport_ImportModule("io");
+    if (!io_module) throw std::runtime_error("Could not import io module");
+
+    // Create a BytesIO object
+    PyObject* bytes_io = PyObject_CallMethod(io_module, "BytesIO", nullptr);
+    if (!bytes_io) throw std::runtime_error("Could not create BytesIO object");
+
+    // Prepare arguments for savefig
+    PyObject* args = PyTuple_New(1);
+    PyTuple_SetItem(args, 0, bytes_io);
+
+    PyObject* kwargs = PyDict_New();
+    if (dpi > 0) {
+        PyDict_SetItemString(kwargs, "dpi", PyLong_FromLong(dpi));
+    }
+    PyDict_SetItemString(kwargs, "format", PyUnicode_FromString("png"));
+
+    // Call savefig with BytesIO object
+    PyObject* res = PyObject_Call(detail::_interpreter::get().s_python_function_save, args, kwargs);
+    if (!res) throw std::runtime_error("Call to savefig() failed.");
+
+    // Get the value from BytesIO
+    PyObject* getvalue = PyObject_CallMethod(bytes_io, "getvalue", nullptr);
+    if (!getvalue) throw std::runtime_error("Could not get value from BytesIO");
+
+    // Convert the bytes data to a C++ vector
+    char* data;
+    Py_ssize_t size;
+    if (PyBytes_AsStringAndSize(getvalue, &data, &size) == -1) 
+    {
+        throw std::runtime_error("Could not retrieve data from BytesIO");
+    }
+    std::vector<uint8_t> buffer(data, data + size);
+
+    // Clean up
+    Py_DECREF(args);
+    Py_DECREF(kwargs);
+    Py_DECREF(res);
+    Py_DECREF(bytes_io);
+    Py_DECREF(getvalue);
+    Py_DECREF(io_module);
+
+    return buffer;
+}
+
+
+
+
+//---------------------
+
+
 
 inline void rcparams(const std::map<std::string, std::string>& keywords = {}) {
     detail::_interpreter::get();
