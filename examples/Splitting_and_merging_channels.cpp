@@ -146,7 +146,8 @@ int main() {
 
 
         // Display the image using OpenCV GUI, all windows open simultaneously:
-
+		
+        cv::imshow("Original Image", image);
         cv::imshow("Matplotlib Plot with Image Red", red_plot_channel);
         cv::imshow("Matplotlib Plot with Image Green", green_plot_channel);
         cv::imshow("Matplotlib Plot with Image Blue", blue_plot_channel);
